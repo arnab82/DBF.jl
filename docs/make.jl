@@ -14,6 +14,7 @@ makedocs(;
     ),
     pages=[
         "Home" => "index.md",
+        "Theory and Workflow" => "theory_and_workflow.md",
     ],
 )
 
