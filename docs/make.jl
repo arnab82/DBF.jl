@@ -5,7 +5,7 @@ DocMeta.setdocmeta!(DBF, :DocTestSetup, :(using DBF); recursive=true)
 
 makedocs(;
     modules=[DBF],
-    authors="Nick Mayhall",
+    authors="Nick Mayhall and contributors",
     sitename="DBF.jl",
     format=Documenter.HTML(;
         canonical="https://nmayhall.github.io/DBF.jl",
@@ -14,6 +14,10 @@ makedocs(;
     ),
     pages=[
         "Home" => "index.md",
+        "Theory and Mathematics" => "theory.md",
+        "DBF Variants Comparison" => "dbf_variants.md",
+        "Repository Structure" => "structure.md",
+        "User Guide and Examples" => "guide.md",
     ],
 )
 
