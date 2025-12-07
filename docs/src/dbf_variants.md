@@ -335,7 +335,7 @@ end
 **Optimization Function:** `optimize_theta_disentangle` (line 24)
 - Computes: `C(θ) = ||P(H(θ))||²` 
 - Similar form to diagonalization but projects onto P-space instead of diagonal
-- Minimizes P-space norm to reduce entanglement across cut
+- Maximizes P-space norm (equivalently minimizes Q-space coupling across the cut)
 
 ---
 
