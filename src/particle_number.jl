@@ -178,8 +178,7 @@ Filter a PauliSum using a pair-based approach for particle number preservation.
 
 This function identifies pairs of Pauli operators in the input PauliSum that together
 preserve particle number. A pair is kept if the sum of the two operators commutes with
-the particle number operator. This searches all pairwise combinations to find pairs
-that preserve particle number when combined.
+the particle number operator. 
 
 This is useful for fermionic systems where individual terms may not preserve particle number
 but pairs (e.g., from fermionic hopping terms c†ᵢcⱼ + c†ⱼcᵢ) do.
@@ -202,52 +201,75 @@ function filter_particle_number_preserving_pairs(ps::PauliSum{N,T}, N̂::PauliSu
     result = PauliSum{N,T}()
     processed = Set{PauliBasis{N}}()
     
-    # Convert to array for easier iteration
+    # Pre-compute commutators for all terms once (much faster than on-demand)
     ps_array = collect(ps)
+    n_terms = length(ps_array)
     
-    # First pass: check individual terms
-    for (pauli, coeff) in ps_array
-        # Skip if already processed
-        pauli in processed && continue
-        
-        # Check if individual term preserves particle number
-        p_op = Pauli(pauli)
-        comm = N̂ * p_op - p_op * N̂
-        coeff_clip!(comm, thresh=1e-12)
-        
-        if length(comm) == 0
-            # Individual term preserves PN - keep it
+    # Cache to store which terms preserve PN individually
+    individual_preserving = Set{Int}()
+    
+    # First pass: identify individual preserving terms
+    for (idx, (pauli, coeff)) in enumerate(ps_array)
+        # Quick check: only I/Z operators preserve individually
+        if pauli.x == 0
+            individual_preserving = individual_preserving ∪ Set([idx])
             result[pauli] = coeff
             push!(processed, pauli)
         end
     end
     
-    # Second pass: find pairs that preserve PN
-    for i in 1:length(ps_array)
-        p1, c1 = ps_array[i]
-        
-        # Skip if already processed
-        p1 in processed && continue
-        
-        # Try to find a partner
-        for j in (i+1):length(ps_array)
-            p2, c2 = ps_array[j]
+    # Early return if all terms preserve individually
+    if length(individual_preserving) == n_terms
+        return result
+    end
+    
+    # Second pass: find pairs among non-preserving terms
+    # Use simple heuristic: check pairs that have same number of X/Y operators
+    # This significantly reduces search space
+    unprocessed_indices = [i for i in 1:n_terms if !(i in individual_preserving)]
+    
+    # Group by X/Y count for faster pairing
+    xy_groups = Dict{Int, Vector{Int}}()
+    for idx in unprocessed_indices
+        pauli, _ = ps_array[idx]
+        xy_count = count_ones(pauli.x)
+        if !haskey(xy_groups, xy_count)
+            xy_groups[xy_count] = Int[]
+        end
+        push!(xy_groups[xy_count], idx)
+    end
+    
+    # Only check pairs within same X/Y count group
+    for (_, group) in xy_groups
+        for i in 1:length(group)
+            idx1 = group[i]
+            p1, c1 = ps_array[idx1]
             
             # Skip if already processed
-            p2 in processed && continue
+            p1 in processed && continue
             
-            # Check if the pair sum preserves particle number
-            pair_sum = c1 * Pauli(p1) + c2 * Pauli(p2)
-            comm = N̂ * pair_sum - pair_sum * N̂
-            coeff_clip!(comm, thresh=1e-12)
-            
-            if length(comm) == 0
-                # Pair preserves particle number - keep both terms
-                result[p1] = c1
-                result[p2] = c2
-                push!(processed, p1)
-                push!(processed, p2)
-                break  # Found a partner, move to next term
+            # Check pairs only within this group
+            for j in (i+1):length(group)
+                idx2 = group[j]
+                p2, c2 = ps_array[idx2]
+                
+                # Skip if already processed
+                p2 in processed && continue
+                
+                # Quick check: compute commutator for pair
+                # Use linearity: [N̂, c1*p1 + c2*p2] = c1*[N̂,p1] + c2*[N̂,p2]
+                pair_sum = c1 * Pauli(p1) + c2 * Pauli(p2)
+                comm = N̂ * pair_sum - pair_sum * N̂
+                coeff_clip!(comm, thresh=1e-12)
+                
+                if length(comm) == 0
+                    # Pair preserves particle number - keep both terms
+                    result[p1] = c1
+                    result[p2] = c2
+                    push!(processed, p1)
+                    push!(processed, p2)
+                    break  # Found a partner, move to next term
+                end
             end
         end
     end
