@@ -92,6 +92,7 @@ function dbf_groundstate(Oin::PauliSum{N,T}, ψ::Ket{N};
             clifford_check = false,
             compute_var_error = true,
             compute_pt2_error = false,
+            preserve_particle_number = false,
             checkfile=nothing) where {N,T}
        
 
@@ -180,6 +181,9 @@ function dbf_groundstate(Oin::PauliSum{N,T}, ψ::Ket{N};
         end
         if grad_mweight_thresh < N
             @timeit to "mclip" majorana_weight_clip!(G, grad_mweight_thresh)
+        end
+        if preserve_particle_number
+            @timeit to "particle_filter" G = filter_particle_number_preserving(G)
         end
        
         if length(G) == 0

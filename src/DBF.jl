@@ -12,6 +12,7 @@ XZPauliSum{T} = Dict{Int128,Vector{Tuple{Int128,T}}}
 include("helpers.jl")
 include("hamiltonians.jl")
 include("diagonalization.jl")
+include("particle_number.jl")
 include("groundstate.jl")
 include("disentangle.jl")
 include("adapt.jl")
@@ -38,5 +39,8 @@ export Y_gate
 export Z_gate 
 export S_gate 
 export T_gate 
+export particle_number_operator
+export preserves_particle_number
+export filter_particle_number_preserving 
 
 end
