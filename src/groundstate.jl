@@ -94,6 +94,7 @@ function dbf_groundstate(Oin::PauliSum{N,T}, ψ::Ket{N};
             compute_pt2_error = false,
             preserve_particle_number = false,
             particle_number_operator = nothing,
+            use_pair_filter = false,
             checkfile=nothing) where {N,T}
        
 
@@ -197,7 +198,11 @@ function dbf_groundstate(Oin::PauliSum{N,T}, ψ::Ket{N};
             @timeit to "mclip" majorana_weight_clip!(G, grad_mweight_thresh)
         end
         if preserve_particle_number && N̂ !== nothing
-            @timeit to "particle_filter" G = filter_particle_number_preserving(G, N̂)
+            if use_pair_filter
+                @timeit to "particle_filter" G = filter_particle_number_preserving_pairs(G, N̂)
+            else
+                @timeit to "particle_filter" G = filter_particle_number_preserving(G, N̂)
+            end
         end
        
         if length(G) == 0
@@ -250,7 +255,7 @@ function dbf_groundstate(Oin::PauliSum{N,T}, ψ::Ket{N};
 
 
             # O = evolve(O,G,θi)
-            @timeit to "evolve" evolve!(O,Gi,θi)
+            @timeit to "evolve" evolve!(O,Gi,θi, preserve_particle_number=preserve_particle_number)
 
             n1 = norm(O)
             pt2_1 = 0

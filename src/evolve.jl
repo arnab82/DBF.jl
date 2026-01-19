@@ -4,7 +4,7 @@ using LinearAlgebra
 
 
 """
-    evolve(O::PauliSum{N, T}, G::PauliBasis{N}, θ::Real)
+    evolve(O::PauliSum{N, T}, G::PauliBasis{N}, θ::Real; preserve_particle_number::Bool=false)
 
 Evolve the `O` by `G` 
 O(θ) = exp(i θ/2 G) O exp(-i θ/2 G)
@@ -13,8 +13,14 @@ if [G,O] == 0
     O(θ) = O 
 else
     O(θ) = O cos(θ) - i sin(θ) G*O
+
+# Arguments
+- `O::PauliSum{N, T}`: Operator to evolve
+- `G::PauliBasis{N}`: Generator
+- `θ::Real`: Evolution parameter
+- `preserve_particle_number::Bool=false`: If true, filter out terms with odd X+Y count during propagation
 """
-function evolve(O::PauliSum{N, T}, G::PauliBasis{N}, θ::Real) where {N,T}
+function evolve(O::PauliSum{N, T}, G::PauliBasis{N}, θ::Real; preserve_particle_number::Bool=false) where {N,T}
     _cos = cos(θ)
     _sin = 1im*sin(θ)
     cos_branch = deepcopy(O) 
@@ -25,6 +31,18 @@ function evolve(O::PauliSum{N, T}, G::PauliBasis{N}, θ::Real) where {N,T}
             # replace sum! with more efficient version
             # sum!(sin_branch, c*_sin*G*p)
             tmp = c*_sin*G*p
+            
+            # Apply particle number filter if requested
+            if preserve_particle_number
+                p_new = PauliBasis(tmp)
+                # Check if the new Pauli string has odd count of X+Y operators
+                num_xy = count_ones(p_new.x)
+                if isodd(num_xy)
+                    # Skip this term - doesn't preserve particle number
+                    continue
+                end
+            end
+            
             curr = get(sin_branch, PauliBasis(tmp), 0.0) + PauliOperators.coeff(tmp)
             sin_branch[PauliBasis(tmp)] = curr 
         end
@@ -34,7 +52,24 @@ function evolve(O::PauliSum{N, T}, G::PauliBasis{N}, θ::Real) where {N,T}
 end
 
 
-function evolve!(O::PauliSum{N, T}, G::PauliBasis{N}, θ::Real) where {N,T}
+"""
+    evolve!(O::PauliSum{N, T}, G::PauliBasis{N}, θ::Real; preserve_particle_number::Bool=false)
+
+Evolve the `O` in place by `G` 
+O(θ) = exp(i θ/2 G) O exp(-i θ/2 G)
+
+if [G,O] == 0
+    O(θ) = O 
+else
+    O(θ) = O cos(θ) - i sin(θ) G*O
+
+# Arguments
+- `O::PauliSum{N, T}`: Operator to evolve
+- `G::PauliBasis{N}`: Generator
+- `θ::Real`: Evolution parameter
+- `preserve_particle_number::Bool=false`: If true, filter out terms with odd X+Y count during propagation
+"""
+function evolve!(O::PauliSum{N, T}, G::PauliBasis{N}, θ::Real; preserve_particle_number::Bool=false) where {N,T}
     _cos = cos(θ)
     _sin = 1im*sin(θ)
     sin_branch = PauliSum(N)
@@ -43,6 +78,19 @@ function evolve!(O::PauliSum{N, T}, G::PauliBasis{N}, θ::Real) where {N,T}
             # replace sum! with more efficient version
             # sum!(sin_branch, c*_sin*G*p)
             tmp = c*_sin*G*p
+            
+            # Apply particle number filter if requested
+            if preserve_particle_number
+                p_new = PauliBasis(tmp)
+                # Check if the new Pauli string has odd count of X+Y operators
+                num_xy = count_ones(p_new.x)
+                if isodd(num_xy)
+                    # Skip this term - doesn't preserve particle number
+                    O[p] *= _cos
+                    continue
+                end
+            end
+            
             curr = get(sin_branch, PauliBasis(tmp), 0.0) + PauliOperators.coeff(tmp)
             sin_branch[PauliBasis(tmp)] = curr 
             O[p] *= _cos

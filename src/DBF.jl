@@ -41,6 +41,7 @@ export S_gate
 export T_gate 
 export particle_number_operator
 export preserves_particle_number
-export filter_particle_number_preserving 
+export filter_particle_number_preserving
+export filter_particle_number_preserving_pairs 
 
 end
