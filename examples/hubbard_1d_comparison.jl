@@ -5,19 +5,20 @@ using Printf
 using Random
 
 """
-Demonstration: 1D Hubbard model (4 sites) with half-filling and particle number preservation
+Demonstration: 1D Hubbard model (4 sites) with particle number preservation
 
-For demonstration, we use a 1D system:
+Shows the recommended approach: pair-based filtering for particle number preservation.
+
+System setup:
 - 4 physical sites
 - 2 spin orbitals per site (up and down)
 - Total of 8 qubits
-
-Half-filling means 2 electrons.
+- Half-filling: 2 electrons
 """
 
 println("="^80)
-println("1D Fermi-Hubbard Model (4 sites) with Half-Filling")
-println("Using Particle Number Preservation in DBF Ground State")
+println("1D Fermi-Hubbard Model (4 sites) with Pair-Based Filtering")
+println("Recommended Approach for Particle Number Preservation")
 println("="^80)
 println()
 
@@ -72,28 +73,12 @@ println("Checking Hamiltonian properties...")
 println("  Does H preserve particle number? ", DBF.preserves_particle_number(H))
 println()
 
-# Run DBF ground state optimization WITHOUT particle number preservation
+# Run DBF ground state optimization WITH pair-based filtering (recommended)
 println("="^80)
-println("First: Running WITHOUT particle number preservation")
-println("="^80)
-println()
-
-res_no_pn = DBF.dbf_groundstate(deepcopy(H), ψ,
-                n_body=1,
-                max_iter=10,
-                conv_thresh=1e-6,
-                evolve_coeff_thresh=1e-10,
-                grad_coeff_thresh=1e-10,
-                preserve_particle_number=false,
-                verbose=1)
-
-println()
-println("="^80)
-println("Now: Running WITH particle number preservation")
+println("Running WITH Pair-Based Particle Number Preservation (Recommended)")
 println("="^80)
 println()
 
-# Run DBF ground state optimization WITH particle number preservation
 res_with_pn = DBF.dbf_groundstate(deepcopy(H), ψ,
                 n_body=1,
                 max_iter=10,
@@ -101,45 +86,35 @@ res_with_pn = DBF.dbf_groundstate(deepcopy(H), ψ,
                 evolve_coeff_thresh=1e-10,
                 grad_coeff_thresh=1e-10,
                 preserve_particle_number=true,
+                use_pair_filter=true,  # Pair-based filtering (default)
                 verbose=1)
 
 println()
 println("="^80)
-println("Comparison of Results:")
+println("Results:")
 println("="^80)
 println()
 
 # Check particle number after transformation
-final_particle_num_no_pn = real(expectation_value(N̂, ψ))
-final_particle_num_with_pn = real(expectation_value(N̂, ψ))
+final_particle_num = real(expectation_value(N̂, ψ))
 
-println("WITHOUT Particle Number Preservation:")
-println("  Number of generators: ", length(res_no_pn["generators"]))
-println("  Final energy: ", real(res_no_pn["energies"][end]))
-println("  Energy lowering: ", real(res_no_pn["energies"][1] - res_no_pn["energies"][end]))
-println("  Final variance: ", real(res_no_pn["variances"][end]))
-println("  Final H terms: ", length(res_no_pn["hamiltonian"]))
-if length(res_no_pn["generators"]) > 0
-    n_pn_preserving = sum(DBF.preserves_particle_number.(res_no_pn["generators"]))
-    println("  Generators preserving particle number: $(n_pn_preserving)/$(length(res_no_pn["generators"]))")
-end
+println("Particle Number Preservation:")
+println("  Initial particle number: $(particle_num)")
+println("  Final particle number: $(final_particle_num)")
+println("  Change: $(abs(final_particle_num - particle_num))")
 println()
 
-println("WITH Particle Number Preservation:")
+println("Optimization Results:")
 println("  Number of generators: ", length(res_with_pn["generators"]))
 println("  Final energy: ", real(res_with_pn["energies"][end]))
 println("  Energy lowering: ", real(res_with_pn["energies"][1] - res_with_pn["energies"][end]))
 println("  Final variance: ", real(res_with_pn["variances"][end]))
 println("  Final H terms: ", length(res_with_pn["hamiltonian"]))
-if length(res_with_pn["generators"]) > 0
-    n_pn_preserving = sum(DBF.preserves_particle_number.(res_with_pn["generators"]))
-    println("  All generators preserve particle number: ", all(DBF.preserves_particle_number.(res_with_pn["generators"])))
-end
 println()
 
 # Show some example generators
 if length(res_with_pn["generators"]) > 0
-    println("Example particle-number-preserving generators:")
+    println("Example generators (first 5):")
     for (i, gen) in enumerate(res_with_pn["generators"][1:min(5, length(res_with_pn["generators"]))])
         num_flips = count_ones(gen.x)
         println("  $(i): $(string(gen)) ($(num_flips) X/Y operators)")

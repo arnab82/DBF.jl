@@ -103,6 +103,9 @@ using Test
     @testset "filter_particle_number_preserving" begin
         N = 4
         
+        # Create particle number operator
+        N̂ = DBF.particle_number_operator(N)
+        
         # Create a PauliSum with mixed terms
         ps = PauliSum(N)
         ps += Pauli(N)  # Identity - preserves (no X/Y)
@@ -114,8 +117,8 @@ using Test
         ps += Pauli(N, X=[1, 2, 3])  # XXX - does NOT preserve
         ps += Pauli(N, X=[1, 2, 3, 4])  # XXXX - does NOT preserve
         
-        # Filter to keep only preserving terms
-        ps_filtered = DBF.filter_particle_number_preserving(ps)
+        # Filter to keep only preserving terms (using N̂ version)
+        ps_filtered = DBF.filter_particle_number_preserving(ps, N̂)
         
         # Should have 3 terms: Identity, Z, ZZ (only those with no X/Y)
         @test length(ps_filtered) == 3

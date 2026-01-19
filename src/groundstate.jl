@@ -94,7 +94,7 @@ function dbf_groundstate(Oin::PauliSum{N,T}, ψ::Ket{N};
             compute_pt2_error = false,
             preserve_particle_number = false,
             particle_number_operator = nothing,
-            use_pair_filter = false,
+            use_pair_filter = true,  # Default to pair-based filtering (recommended)
             checkfile=nothing) where {N,T}
        
 

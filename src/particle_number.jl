@@ -1,23 +1,32 @@
 """
     particle_number.jl
 
-Functions for handling particle number preservation in Pauli operators.
+Functions for particle number preservation in fermionic systems encoded as Pauli operators.
 
-In quantum computing with fermionic systems encoded in qubits, the particle number
-operator counts the total number of particles (occupied states). For a system of N qubits,
-the particle number operator is:
+The particle number operator for N qubits is:
 
     N̂ = Σᵢ (I - Zᵢ)/2
 
-where the sum runs over all qubits. This counts how many qubits are in the |1⟩ state.
+This counts the number of qubits in the |1⟩ state (occupied orbitals).
 
-A Pauli operator P preserves particle number if [N̂, P] = 0, i.e., if it commutes with
-the particle number operator. For a single-qubit Pauli, this means:
-- I and Z preserve particle number (they don't change occupancy)
-- X and Y do not preserve particle number (they flip occupancy)
+## Key Concept
 
-However, multi-qubit Paulis can preserve particle number even if they contain X or Y,
-as long as the total number of occupancy changes sums to zero.
+Individual Pauli operators rarely preserve particle number in Jordan-Wigner encoding.
+However, pairs of operators (e.g., from fermionic hopping terms c†ᵢcⱼ + c†ⱼcᵢ) can
+preserve particle number together.
+
+## Recommended Usage
+
+For fermionic systems, use **pair-based filtering**:
+- `filter_particle_number_preserving_pairs(ps, N̂)` - finds pairs that preserve PN
+- Enable with `use_pair_filter=true` in dbf_groundstate
+- Also enable propagation-time filtering with `preserve_particle_number=true`
+
+## Individual Term Filtering (Limited Use)
+
+- `preserves_particle_number(p)` - checks if operator has no X/Y (strict check)
+- `filter_particle_number_preserving(ps, N̂)` - filters individual terms (very restrictive)
+- These are mainly useful for testing, not practical optimization
 """
 
 """
@@ -122,39 +131,15 @@ function preserves_particle_number(ps::PauliSum{N,T}) where {N,T}
 end
 
 """
-    filter_particle_number_preserving(ps::PauliSum{N,T}) where {N,T}
-
-Filter a PauliSum to keep only terms that preserve particle number.
-
-# Arguments
-- `ps::PauliSum{N,T}`: A sum of Pauli operators
-
-# Returns
-- `PauliSum{N,T}`: A new PauliSum with only particle-number-preserving terms
-
-# Example
-```julia
-ps = Pauli("X") + Pauli("Z") + Pauli("XX")
-ps_filtered = filter_particle_number_preserving(ps)  # keeps only Z
-```
-"""
-function filter_particle_number_preserving(ps::PauliSum{N,T}) where {N,T}
-    result = PauliSum{N,T}()
-    for (pauli, coeff) in ps
-        if preserves_particle_number(pauli)
-            result[pauli] = coeff
-        end
-    end
-    return result
-end
-
-"""
     filter_particle_number_preserving(ps::PauliSum{N,T}, N̂::PauliSum{N}) where {N,T}
 
 Filter a PauliSum to keep only terms that commute with a given particle number operator.
 
 This version checks actual commutation [N̂, p] = 0 rather than using a simple heuristic.
 Use this when working in a transformed basis where the standard check may not apply.
+
+Note: For fermionic systems, individual terms often don't preserve particle number.
+Use `filter_particle_number_preserving_pairs` for better results.
 
 # Arguments
 - `ps::PauliSum{N,T}`: A sum of Pauli operators to filter
