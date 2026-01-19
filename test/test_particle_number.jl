@@ -27,37 +27,45 @@ using Test
     @testset "preserves_particle_number - PauliBasis" begin
         N = 4
         
-        # Identity preserves particle number
+        # Identity preserves particle number (no X or Y)
         p_I = PauliBasis{N}(Int128(0), Int128(0))
         @test DBF.preserves_particle_number(p_I) == true
         
-        # Single Z preserves particle number
+        # Single Z preserves particle number (no X or Y)
         p_Z = PauliBasis(Pauli(N, Z=[1]))
         @test DBF.preserves_particle_number(p_Z) == true
         
-        # Single X does not preserve particle number (odd number of flips)
+        # Multiple Z preserves particle number (no X or Y)
+        p_ZZ = PauliBasis(Pauli(N, Z=[1, 2]))
+        @test DBF.preserves_particle_number(p_ZZ) == true
+        
+        # Single X does NOT preserve particle number
         p_X = PauliBasis(Pauli(N, X=[1]))
         @test DBF.preserves_particle_number(p_X) == false
         
-        # Single Y does not preserve particle number (odd number of flips)
+        # Single Y does NOT preserve particle number
         p_Y = PauliBasis(Pauli(N, Y=[1]))
         @test DBF.preserves_particle_number(p_Y) == false
         
-        # XX preserves particle number (even number of flips)
+        # XX does NOT preserve particle number (has X operators)
         p_XX = PauliBasis(Pauli(N, X=[1, 2]))
-        @test DBF.preserves_particle_number(p_XX) == true
+        @test DBF.preserves_particle_number(p_XX) == false
         
-        # XY preserves particle number (even number of flips)
+        # XY does NOT preserve particle number (has X and Y operators)
         p_XY = PauliBasis(Pauli(N, X=[1], Y=[2]))
-        @test DBF.preserves_particle_number(p_XY) == true
+        @test DBF.preserves_particle_number(p_XY) == false
         
-        # XXX does not preserve particle number (odd number of flips)
+        # XXX does NOT preserve particle number (has X operators)
         p_XXX = PauliBasis(Pauli(N, X=[1, 2, 3]))
         @test DBF.preserves_particle_number(p_XXX) == false
         
-        # XXXX preserves particle number (even number of flips)
+        # XXXX does NOT preserve particle number (has X operators)
         p_XXXX = PauliBasis(Pauli(N, X=[1, 2, 3, 4]))
-        @test DBF.preserves_particle_number(p_XXXX) == true
+        @test DBF.preserves_particle_number(p_XXXX) == false
+        
+        # XZ does NOT preserve particle number (has X operator)
+        p_XZ = PauliBasis(Pauli(N, X=[1], Z=[2]))
+        @test DBF.preserves_particle_number(p_XZ) == false
     end
     
     @testset "preserves_particle_number - Pauli" begin
@@ -70,24 +78,25 @@ using Test
         p_X = Pauli(N, X=[1])
         @test DBF.preserves_particle_number(p_X) == false
         
+        # XX does NOT preserve (has X operators)
         p_XX = Pauli(N, X=[1, 2])
-        @test DBF.preserves_particle_number(p_XX) == true
+        @test DBF.preserves_particle_number(p_XX) == false
     end
     
     @testset "preserves_particle_number - PauliSum" begin
         N = 4
         
-        # PauliSum with only particle-number-preserving terms
+        # PauliSum with only particle-number-preserving terms (only I and Z)
         ps1 = PauliSum(N)
-        ps1 += Pauli(N)  # Identity
-        ps1 += Pauli(N, Z=[1])  # Z
-        ps1 += Pauli(N, X=[1, 2])  # XX
+        ps1 += Pauli(N)  # Identity - preserves
+        ps1 += Pauli(N, Z=[1])  # Z - preserves
+        ps1 += Pauli(N, Z=[1, 2])  # ZZ - preserves
         @test DBF.preserves_particle_number(ps1) == true
         
-        # PauliSum with a non-preserving term
+        # PauliSum with a non-preserving term (has X)
         ps2 = PauliSum(N)
         ps2 += Pauli(N, Z=[1])
-        ps2 += Pauli(N, X=[1])  # Single X - does not preserve
+        ps2 += Pauli(N, X=[1])  # Single X - does NOT preserve
         @test DBF.preserves_particle_number(ps2) == false
     end
     
@@ -96,19 +105,20 @@ using Test
         
         # Create a PauliSum with mixed terms
         ps = PauliSum(N)
-        ps += Pauli(N)  # Identity - preserves
-        ps += Pauli(N, Z=[1])  # Z - preserves
-        ps += Pauli(N, X=[1])  # X - does not preserve
-        ps += Pauli(N, X=[1, 2])  # XX - preserves
-        ps += Pauli(N, Y=[1])  # Y - does not preserve
-        ps += Pauli(N, X=[1, 2, 3])  # XXX - does not preserve
-        ps += Pauli(N, X=[1, 2, 3, 4])  # XXXX - preserves
+        ps += Pauli(N)  # Identity - preserves (no X/Y)
+        ps += Pauli(N, Z=[1])  # Z - preserves (no X/Y)
+        ps += Pauli(N, Z=[1, 2])  # ZZ - preserves (no X/Y)
+        ps += Pauli(N, X=[1])  # X - does NOT preserve
+        ps += Pauli(N, X=[1, 2])  # XX - does NOT preserve
+        ps += Pauli(N, Y=[1])  # Y - does NOT preserve
+        ps += Pauli(N, X=[1, 2, 3])  # XXX - does NOT preserve
+        ps += Pauli(N, X=[1, 2, 3, 4])  # XXXX - does NOT preserve
         
         # Filter to keep only preserving terms
         ps_filtered = DBF.filter_particle_number_preserving(ps)
         
-        # Should have 4 terms: Identity, Z, XX, XXXX
-        @test length(ps_filtered) == 4
+        # Should have 3 terms: Identity, Z, ZZ (only those with no X/Y)
+        @test length(ps_filtered) == 3
         
         # Check that all remaining terms preserve particle number
         @test DBF.preserves_particle_number(ps_filtered) == true
@@ -116,8 +126,7 @@ using Test
         # Check that the filtered terms are correct
         @test haskey(ps_filtered, PauliBasis{N}(Int128(0), Int128(0)))  # Identity
         @test haskey(ps_filtered, PauliBasis(Pauli(N, Z=[1])))  # Z
-        @test haskey(ps_filtered, PauliBasis(Pauli(N, X=[1, 2])))  # XX
-        @test haskey(ps_filtered, PauliBasis(Pauli(N, X=[1, 2, 3, 4])))  # XXXX
+        @test haskey(ps_filtered, PauliBasis(Pauli(N, Z=[1, 2])))  # ZZ
         
         # Check that non-preserving terms are not present
         @test !haskey(ps_filtered, PauliBasis(Pauli(N, X=[1])))  # X

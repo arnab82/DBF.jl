@@ -93,6 +93,7 @@ function dbf_groundstate(Oin::PauliSum{N,T}, ψ::Ket{N};
             compute_var_error = true,
             compute_pt2_error = false,
             preserve_particle_number = false,
+            particle_number_operator = nothing,
             checkfile=nothing) where {N,T}
        
 
@@ -166,6 +167,19 @@ function dbf_groundstate(Oin::PauliSum{N,T}, ψ::Ket{N};
 
     P = create_0_projector(N, n_body)
     
+    # Set up particle number operator for filtering if requested
+    N̂ = nothing
+    if preserve_particle_number
+        if particle_number_operator === nothing
+            # Create default particle number operator
+            N̂ = DBF.particle_number_operator(N)
+            verbose < 1 || @printf(" Using default particle number operator\n")
+        else
+            N̂ = particle_number_operator
+            verbose < 1 || @printf(" Using provided particle number operator\n")
+        end
+    end
+    
     for iter in 1:max_iter
         
         time = 0
@@ -182,8 +196,8 @@ function dbf_groundstate(Oin::PauliSum{N,T}, ψ::Ket{N};
         if grad_mweight_thresh < N
             @timeit to "mclip" majorana_weight_clip!(G, grad_mweight_thresh)
         end
-        if preserve_particle_number
-            @timeit to "particle_filter" G = filter_particle_number_preserving(G)
+        if preserve_particle_number && N̂ !== nothing
+            @timeit to "particle_filter" G = filter_particle_number_preserving(G, N̂)
         end
        
         if length(G) == 0

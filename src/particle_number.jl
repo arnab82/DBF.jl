@@ -62,38 +62,30 @@ end
 
 Check if a Pauli operator preserves particle number.
 
-A Pauli operator preserves particle number if it commutes with the number operator.
-For a Pauli string, this is true if:
-1. It contains only I and Z operators (no X or Y), OR
-2. The X and Y operators come in pairs that preserve total particle number
+A Pauli operator preserves particle number if it commutes with the particle number operator
+N̂ = Σᵢ (I - Zᵢ)/2. This requires [Zᵢ, P] = 0 for all i.
 
-For simplicity, this function checks the X operators (which cause bit flips).
-A Pauli preserves particle number if the number of X/Y operators is even and they
-are arranged such that each creation is paired with an annihilation.
+Since Zᵢ anti-commutes with Xᵢ and Yᵢ, P preserves particle number if and only if it contains
+NO X or Y operators on any qubit - it must be composed only of I and Z operators.
 
 # Arguments
 - `p::PauliBasis{N}`: A Pauli operator
 
 # Returns
-- `Bool`: true if the operator preserves particle number
+- `Bool`: true if the operator preserves particle number (contains only I and Z)
 
 # Example
 ```julia
-p1 = PauliBasis("IIZZ")  # preserves: no X or Y
-p2 = PauliBasis("XYII")  # can preserve if proper pairing
-p3 = PauliBasis("XIII")  # does not preserve: single X
+p1 = PauliBasis(Pauli(4, Z=[1,2]))  # preserves: only Z
+p2 = PauliBasis(Pauli(4, X=[1]))    # does NOT preserve: has X
+p3 = PauliBasis(Pauli(4, X=[1,2]))  # does NOT preserve: has X
 ```
 """
 function preserves_particle_number(p::PauliBasis{N}) where N
-    # Count the number of X or Y operators (operators that flip qubits)
-    # In the symplectic representation, x bit is set for both X and Y
-    num_flips = count_ones(p.x)
-    
-    # For particle number preservation, we need an even number of flips
-    # (each "creation" must be paired with an "annihilation")
-    # This is a necessary but not always sufficient condition
-    # For a more rigorous check, we'd need to verify the specific structure
-    return iseven(num_flips)
+    # In the symplectic representation, the x bit is set for both X and Y operators
+    # P preserves particle number if and only if it has NO X or Y operators
+    # i.e., p.x must be zero
+    return p.x == 0
 end
 
 """
@@ -143,13 +135,51 @@ Filter a PauliSum to keep only terms that preserve particle number.
 # Example
 ```julia
 ps = Pauli("X") + Pauli("Z") + Pauli("XX")
-ps_filtered = filter_particle_number_preserving(ps)  # keeps Z and XX
+ps_filtered = filter_particle_number_preserving(ps)  # keeps only Z
 ```
 """
 function filter_particle_number_preserving(ps::PauliSum{N,T}) where {N,T}
     result = PauliSum{N,T}()
     for (pauli, coeff) in ps
         if preserves_particle_number(pauli)
+            result[pauli] = coeff
+        end
+    end
+    return result
+end
+
+"""
+    filter_particle_number_preserving(ps::PauliSum{N,T}, N̂::PauliSum{N}) where {N,T}
+
+Filter a PauliSum to keep only terms that commute with a given particle number operator.
+
+This version checks actual commutation [N̂, p] = 0 rather than using a simple heuristic.
+Use this when working in a transformed basis where the standard check may not apply.
+
+# Arguments
+- `ps::PauliSum{N,T}`: A sum of Pauli operators to filter
+- `N̂::PauliSum{N}`: The particle number operator
+
+# Returns
+- `PauliSum{N,T}`: A new PauliSum with only terms that commute with N̂
+
+# Example
+```julia
+N̂ = particle_number_operator(4)
+ps = Pauli(4, X=[1]) + Pauli(4, Z=[1])
+ps_filtered = filter_particle_number_preserving(ps, N̂)  # keeps only Z
+```
+"""
+function filter_particle_number_preserving(ps::PauliSum{N,T}, N̂::PauliSum{N}) where {N,T}
+    result = PauliSum{N,T}()
+    for (pauli, coeff) in ps
+        # Check if [N̂, pauli] = 0
+        p_op = Pauli(pauli)
+        comm = N̂ * p_op - p_op * N̂
+        coeff_clip!(comm, thresh=1e-12)
+        
+        if length(comm) == 0
+            # Commutes with particle number operator
             result[pauli] = coeff
         end
     end
