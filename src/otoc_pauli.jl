@@ -1,10 +1,7 @@
 using PauliOperators
 using LinearAlgebra
 using Printf
-
-include("./hamiltonian.jl")
-include("./observables.jl")
-include("./evolve.jl")
+using DBF
 
 """
     infinite_temp_otoc_pauli(O1::PauliSum{N}, O2::PauliSum{N}, H::PauliSum{N}, t::Real; dt::Real=0.01) where {N}
@@ -50,7 +47,7 @@ function infinite_temp_otoc_pauli(O1::PauliSum{N}, O2::PauliSum{N}, H::PauliSum{
     O2_norm_sq = inner_product(O2, O2)
     
     # OTOC (normalized)
-    if O1_norm_sq > 0 && O2_norm_sq > 0
+    if abs(O1_norm_sq) > 0 && abs(O2_norm_sq) > 0
         otoc = real(comm_norm_sq / (O1_norm_sq * O2_norm_sq))
     else
         otoc = 0.0
@@ -60,7 +57,7 @@ function infinite_temp_otoc_pauli(O1::PauliSum{N}, O2::PauliSum{N}, H::PauliSum{
 end
 
 """
-    run_otoc_pauli(site1_list::Vector{Int}, site2::Int, N::Int, H::PauliSum{N}, 
+    run_otoc_pauli(site1_list::Vector{Int}, site2::Int, N::Int, H::PauliSum, 
                    t_final::Real, dt::Real; evolution_dt::Real=0.01)
 
 Run OTOC calculations for multiple sites using Pauli propagation.
@@ -69,7 +66,7 @@ Run OTOC calculations for multiple sites using Pauli propagation.
 - `site1_list::Vector{Int}`: List of site indices for O1 operators
 - `site2::Int`: Site index for O2 operator
 - `N::Int`: Number of qubits in the system
-- `H::PauliSum{N}`: Hamiltonian for time evolution
+- `H::PauliSum`: Hamiltonian for time evolution
 - `t_final::Real`: Final time for OTOC calculation
 - `dt::Real`: Time step for OTOC sampling
 - `evolution_dt::Real`: Time step for Hamiltonian evolution (default: 0.01)
@@ -77,7 +74,7 @@ Run OTOC calculations for multiple sites using Pauli propagation.
 # Returns
 - `Vector{Float64}`: OTOC values for all sites and times (flattened)
 """
-function run_otoc_pauli(site1_list::Vector{Int}, site2::Int, N::Int, H::PauliSum{N}, 
+function run_otoc_pauli(site1_list::Vector{Int}, site2::Int, N::Int, H::PauliSum, 
                         t_final::Real, dt::Real; evolution_dt::Real=0.01)
     O2_initial = magz(N, site2)
     all_otocs = Float64[]
@@ -102,7 +99,7 @@ function run_otoc_pauli(site1_list::Vector{Int}, site2::Int, N::Int, H::PauliSum
 end
 
 """
-    single_timestep_otoc_pauli(site1::Int, site2::Int, N::Int, H::PauliSum{N}, dt::Real)
+    single_timestep_otoc_pauli(site1::Int, site2::Int, N::Int, H::PauliSum, dt::Real)
 
 Calculate OTOC for a single time step using Pauli propagation.
 
@@ -110,13 +107,13 @@ Calculate OTOC for a single time step using Pauli propagation.
 - `site1::Int`: Site index for O1 operator
 - `site2::Int`: Site index for O2 operator  
 - `N::Int`: Number of qubits in the system
-- `H::PauliSum{N}`: Hamiltonian for time evolution
+- `H::PauliSum`: Hamiltonian for time evolution
 - `dt::Real`: Time step
 
 # Returns
 - `Float64`: The OTOC value at time dt
 """
-function single_timestep_otoc_pauli(site1::Int, site2::Int, N::Int, H::PauliSum{N}, dt::Real)
+function single_timestep_otoc_pauli(site1::Int, site2::Int, N::Int, H::PauliSum, dt::Real)
     O1 = magz(N, site1)
     O2 = magz(N, site2)
     

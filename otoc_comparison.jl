@@ -4,8 +4,8 @@ using Printf
 using Dates
 using PauliOperators
 using LinearAlgebra
+using DBF
 
-include("./src/hamiltonian.jl")
 include("./src/observables.jl")
 include("./src/otoc_pauli.jl")
 
@@ -53,7 +53,7 @@ function main()
 
     # Create Heisenberg Hamiltonian
     println("Creating Heisenberg Hamiltonian...")
-    H = af_heisenberg(N, Jx, Jy, Jz)
+    H = DBF.af_heisenberg(N, Jx, Jy, Jz)
     println("Hamiltonian has $(length(H)) terms")
     println()
 
