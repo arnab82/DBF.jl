@@ -1,4 +1,5 @@
-using PauliOperators
+# Observables for OTOC calculations
+# Assumes PauliOperators is already loaded
 
 """
     magz(N::Int, site::Int)

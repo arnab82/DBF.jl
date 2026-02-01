@@ -1,7 +1,5 @@
-using PauliOperators
-using LinearAlgebra
-using Printf
-using DBF
+# OTOC calculation using Pauli propagation with Trotterization
+# Assumes PauliOperators, LinearAlgebra, Printf are already loaded
 
 """
     infinite_temp_otoc_pauli(O1::PauliSum{N}, O2::PauliSum{N}, H::PauliSum{N}, t::Real; dt::Real=0.01) where {N}
