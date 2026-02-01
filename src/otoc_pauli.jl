@@ -30,7 +30,7 @@ function infinite_temp_otoc_pauli(O1::PauliSum{N}, O2::PauliSum{N}, H::PauliSum{
     for step in 1:n_steps
         # Evolve by each term in the Hamiltonian
         for (p, c) in H
-            θ = -real(c) * dt  # Negative for forward time evolution
+            θ = 2 * real(c) * dt  # Factor of 2 because evolve uses θ/2
             O2t = evolve(O2t, p, θ)
         end
     end

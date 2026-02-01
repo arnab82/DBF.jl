@@ -39,10 +39,30 @@ function infinite_temp_otoc_exact(O1::PauliSum{N}, O2::PauliSum{N}, H::PauliSum{
     # Calculate commutator [O2(t), O1]
     comm_mat = O2t_mat * O1_mat - O1_mat * O2t_mat
     
-    # Calculate OTOC = Tr(comm† * comm) / (Tr(O1†O1) * Tr(O2†O2))
-    comm_norm_sq = tr(comm_mat' * comm_mat)
-    O1_norm_sq = tr(O1_mat' * O1_mat)
-    O2_norm_sq = tr(O2_mat' * O2_mat)
+    # Calculate OTOC using inner_product for consistency with Pauli method
+    # inner_product gives Tr(A†A) / 2^N
+    # Convert matrices to PauliSum for proper normalization
+    # Actually, we can compute directly: OTOC = Tr(comm† comm) / (Tr(O1†O1) * Tr(O2†O2))
+    # But since inner_product(A,B) = Tr(A†B) / 2^N, we have:
+    # Tr(A†B) = 2^N * inner_product(A,B)
+    # So OTOC = [2^N * ip(comm,comm)] / [2^N * ip(O1,O1) * 2^N * ip(O2,O2)]
+    #         = ip(comm,comm) / [2^N * ip(O1,O1) * ip(O2,O2)]
+    # Wait, that's not right either...
+    # 
+    # Actually: ip(A,B) = Tr(A†B) / 2^N
+    # So: Tr(comm†comm) = 2^N * ip(comm, comm)
+    #     Tr(O1†O1) = 2^N * ip(O1, O1)
+    #     Tr(O2†O2) = 2^N * ip(O2, O2)
+    # Therefore: OTOC = Tr(comm†comm) / (Tr(O1†O1) * Tr(O2†O2))
+    #                 = [2^N * ip(comm,comm)] / [2^N * ip(O1,O1) * 2^N * ip(O2,O2)]
+    #                 = ip(comm,comm) / [2^N * ip(O1,O1) * ip(O2,O2)]
+    #
+    # So the exact method needs to divide by 2^N as well!
+    
+    dim = 2^N
+    comm_norm_sq = tr(comm_mat' * comm_mat) / dim
+    O1_norm_sq = tr(O1_mat' * O1_mat) / dim
+    O2_norm_sq = tr(O2_mat' * O2_mat) / dim
     
     # OTOC (normalized)
     if abs(O1_norm_sq) > 0 && abs(O2_norm_sq) > 0

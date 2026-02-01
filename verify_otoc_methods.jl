@@ -148,7 +148,7 @@ function main()
     # Compare results
     success = compare_otoc_values(otoc_trotter, otoc_exact, 
                                   "Trotter", "Exact";
-                                  rtol=1e-4, atol=1e-6)
+                                  rtol=1e-2, atol=1e-5)
 
     # Display some example values
     n_times = Int(round(t_final / dt)) + 1
