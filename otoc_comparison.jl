@@ -29,7 +29,7 @@ Arguments:
 function main()
     start_time = time()
     now = Dates.now()
-    formatted = Dates.format(now, "yyyy-mm-dd HH:MM:SS")
+    formatted = Dates.format(now, "yyyy-MM-dd HH:mm:ss")
     println("START : $formatted\n")
 
     # Parse command line arguments
@@ -128,7 +128,7 @@ function main()
     println("="^60)
     @printf("Total computation time: %.2f seconds\n", elapsed)
     now = Dates.now()
-    formatted = Dates.format(now, "yyyy-mm-dd HH:MM:SS")
+    formatted = Dates.format(now, "yyyy-MM-dd HH:mm:ss")
     println("END : $formatted")
     println("="^60)
 end
