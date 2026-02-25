@@ -78,25 +78,22 @@ function dbf_groundstate(Oin::PauliSum{N,T}, ψ::Ket{N};
             n_body=1, 
             initial_error = 0,
             initial_norm_error = 0,
-            max_iter=10, verbose=1, conv_thresh=1e-3,
-            evolve_coeff_thresh=1e-12,
-            evolve_weight_thresh=nothing,
-            grad_coeff_thresh=1e-8,
-            grad_weight_thresh=nothing,
-            energy_lowering_thresh=1e-3,
+            max_iter=10, 
+            verbose=1, 
+            conv_thresh=1e-3,
+            evolve_coeff_thresh=1e-6,
+            evolve_weight_thresh=N,
+            evolve_mweight_thresh=N,
+            grad_coeff_thresh=1e-6,
+            grad_weight_thresh=N,
+            grad_mweight_thresh=N,
+            energy_lowering_thresh=1e-6,
             max_rots_per_grad = 100,
             clifford_check = false,
             compute_var_error = true,
             compute_pt2_error = false,
             checkfile=nothing) where {N,T}
        
-
-    if grad_weight_thresh === nothing
-        grad_weight_thresh = N
-    end
-    if evolve_weight_thresh === nothing
-        evolve_weight_thresh = N
-    end
 
     O = deepcopy(Oin)
     generators = Vector{PauliBasis{N}}([])
@@ -152,8 +149,8 @@ function dbf_groundstate(Oin::PauliSum{N,T}, ψ::Ket{N};
         verbose < 1 || @printf(" %12s", "PT_error")
     end
     verbose < 1 || @printf(" %10s", "E(2)")
-    verbose < 1 || @printf(" %8s", "norm_err")
-    verbose < 1 || @printf(" %8s", "norm(G)")
+    verbose < 1 || @printf(" %12s", "norm_err")
+    verbose < 1 || @printf(" %9s", "norm(G)")
     verbose < 1 || @printf(" %10s", "len([H,Z])")
     verbose < 1 || @printf(" %8s", "len(G)")
     verbose < 1 || @printf(" %8s", "len(H)")
@@ -177,8 +174,13 @@ function dbf_groundstate(Oin::PauliSum{N,T}, ψ::Ket{N};
         
         len_comm = length(G)
         verbose < 2 || @printf(" length of commutator: %i\n", len_comm)
-        coeff_clip!(G, thresh=grad_coeff_thresh)
-        weight_clip!(G, grad_weight_thresh)
+        @timeit to "clip" coeff_clip!(G, thresh=grad_coeff_thresh)
+        if grad_weight_thresh < N
+            @timeit to "wclip" weight_clip!(G, grad_weight_thresh)
+        end
+        if grad_mweight_thresh < N
+            @timeit to "mclip" majorana_weight_clip!(G, grad_mweight_thresh)
+        end
        
         if length(G) == 0
             @warn " No search direction found. Increase decrease `grad_coeff_thresh`."
@@ -188,7 +190,7 @@ function dbf_groundstate(Oin::PauliSum{N,T}, ψ::Ket{N};
         grad_vec = Vector{Float64}([])
         grad_ops = Vector{PauliBasis{N}}([])
       
-        @timeit to "Pack" xzO = pack_x_z(O)
+        @timeit to "pack" xzO = pack_x_z(O)
         @timeit to "matvec" σv = matvec(xzO, ψ)
 
         # Compute gradient vector
@@ -206,7 +208,7 @@ function dbf_groundstate(Oin::PauliSum{N,T}, ψ::Ket{N};
         end
         
         
-        sorted_idx = reverse(sortperm(abs.(grad_vec)))
+        @timeit to "sort" sorted_idx = reverse(sortperm(abs.(grad_vec)))
         
         verbose < 2 || @printf("     %8s %12s %12s", "G idx", "||O||", "<ψ|H|ψ>")
         verbose < 2 || @printf(" %12s %12s", "len(O)", "θi")
@@ -221,36 +223,47 @@ function dbf_groundstate(Oin::PauliSum{N,T}, ψ::Ket{N};
                 # See if we can do a cheap clifford operation
                 if costi(0) - costi(π / 2) > energy_lowering_thresh
                     θi = π / 2
-                    println("clifford:", string(Gi))
                 end
             end
 
-            #
-            # make sure energy lowering is large enough to warrent evolving
-            costi(0) - costi(θi) > energy_lowering_thresh || continue
+            # #
+            # # make sure energy lowering is large enough to warrent evolving
+            # costi(0) - costi(θi) > energy_lowering_thresh || continue
 
 
             # O = evolve(O,G,θi)
             @timeit to "evolve" evolve!(O,Gi,θi)
 
-            @timeit to "expval" e1 = expectation_value(O,ψ)
-            @timeit to "variance" v1 = variance(O,ψ)
             n1 = norm(O)
             pt2_1 = 0
             pt2_2 = 0
+            v1 = 0
+            v2 = 0
+            @timeit to "expval" e1 = expectation_value(O,ψ)
+            if compute_var_error
+                @timeit to "variance" v1 = variance(O,ψ)
+            end
             if compute_pt2_error
                 @timeit to "pt2" _, pt2_1 = pt2(O, ψ)
             end
             
             #
             # Truncate operator
-            coeff_clip!(O, thresh=evolve_coeff_thresh)
-            weight_clip!(O, evolve_weight_thresh)
+            @timeit to "clip" coeff_clip!(O, thresh=evolve_coeff_thresh)
+            if evolve_weight_thresh < N
+                @timeit to "wclip" weight_clip!(O, evolve_weight_thresh)
+            end
+            if evolve_mweight_thresh < N
+                @timeit to "mclip" majorana_weight_clip!(O, evolve_mweight_thresh)
+            end
+            # weight_clip!(O, evolve_weight_thresh)
             @timeit to "expval" e2 = expectation_value(O,ψ)
-            @timeit to "variance" v2 = variance(O,ψ)
             n2 = norm(O)
             if compute_pt2_error
                 @timeit to "pt2" _, pt2_2 = pt2(O, ψ)
+            end
+            if compute_var_error
+                @timeit to "variance" v2 = variance(O,ψ)
             end
 
             accumulated_error += e2 - e1
@@ -258,7 +271,7 @@ function dbf_groundstate(Oin::PauliSum{N,T}, ψ::Ket{N};
             accumulated_var_error += v2 - v1
             accumulated_norm_error += n2^2 - n1^2
             
-            @timeit to "expval" ecurr = expectation_value(O, ψ) 
+            ecurr = e2 
             verbose < 2 || @printf("     %8i %12.8f %12.8f", gi, norm(O), ecurr)
             verbose < 2 || @printf(" %12i %12.8f %s", length(O), θi, string(G))
             verbose < 2 || @printf("\n")
@@ -268,7 +281,9 @@ function dbf_groundstate(Oin::PauliSum{N,T}, ψ::Ket{N};
             push!(out["accumulated_error"], real(accumulated_error))
             push!(out["accumulated_var_error"], real(accumulated_var_error))
             push!(out["energies"], ecurr)
-            push!(out["variances"], v2)
+            if compute_var_error
+                push!(out["variances"], v2)
+            end
             push!(out["norms"], n2)
             push!(out["generators"], Gi) 
             push!(out["angles"], θi)
@@ -289,10 +304,10 @@ function dbf_groundstate(Oin::PauliSum{N,T}, ψ::Ket{N};
             verbose < 1 || @printf(" %12.8f", real(accumulated_pt2_error))
         end
         verbose < 1 || @printf(" %10.6f", real(e2))
-        verbose < 1 || @printf(" %8.1e", accumulated_norm_error)
-        verbose < 1 || @printf(" %8.1e", norm(grad_vec))
-        verbose < 1 || @printf(" %10.1e", len_comm)
-        verbose < 1 || @printf(" %8.1e", length(grad_vec))
+        verbose < 1 || @printf(" %12.8f", accumulated_norm_error)
+        verbose < 1 || @printf(" %8.3e", norm(grad_vec))
+        verbose < 1 || @printf(" %10i", len_comm)
+        verbose < 1 || @printf(" %8i", length(grad_vec))
         verbose < 1 || @printf(" %8i", length(O))
         verbose < 1 || @printf(" %4i", n_rots)
         verbose < 1 || @printf(" %8.4f", real(var_curr))
