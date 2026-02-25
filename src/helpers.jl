@@ -403,39 +403,40 @@ end
 
 
 
-function Base.sum!(O::KetSum{N,T}, k::KetSum{N}) where {N,T}
-    out = KetSum(N)
-    for (p,c) in O
-        c2,k2 = p*k
-        tmp = get(out, k2, 0.0)
-        out[k2] = tmp + c2*c
-    end
-    return out 
-end
+# function Base.sum!(O::KetSum{N,T}, k::KetSum{N}) where {N,T}
+#     out = KetSum(N)
+#     for (p,c) in O
+#         c2,k2 = p*k
+#         tmp = get(out, k2, 0.0)
+#         out[k2] = tmp + c2*c
+#     end
+#     return out 
+# end
 
-function Base.:*(O::PauliSum{N,T}, k::Ket{N}) where {N,T}
-    out = KetSum(N)
-    for (p,c) in O
-        c2,k2 = p*k
-        tmp = get(out, k2, 0.0)
-        out[k2] = tmp + c2*c
-    end
-    return out 
-end
 
-function PauliOperators.expectation_value(O::PauliSum, v::KetSum)
-    ev = 0
-    for (p,c) in O
-        for (k1,c1) in v
-            ev += expectation_value(p,k1)*c*c1'*c1
-            for (k2,c2) in v
-                k2 != k1 || continue
-                ev += matrix_element(k2', p, k1)*c*c2'*c1
-            end
-        end
-    end
-    return ev
-end
+# function Base.:*(O::PauliSum{N,T}, k::Ket{N}) where {N,T}
+#     out = KetSum(N)
+#     for (p,c) in O
+#         c2,k2 = p*k
+#         tmp = get(out, k2, 0.0)
+#         out[k2] = tmp + c2*c
+#     end
+#     return out 
+# end
+
+# function PauliOperators.expectation_value(O::PauliSum, v::KetSum)
+#     ev = 0
+#     for (p,c) in O
+#         for (k1,c1) in v
+#             ev += expectation_value(p,k1)*c*c1'*c1
+#             for (k2,c2) in v
+#                 k2 != k1 || continue
+#                 ev += matrix_element(k2', p, k1)*c*c2'*c1
+#             end
+#         end
+#     end
+#     return ev
+# end
 
 function PauliOperators.expectation_value(O::XZPauliSum, v::KetSum{N,T}) where {N,T}
     ev = 0

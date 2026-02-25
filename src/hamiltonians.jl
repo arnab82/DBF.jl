@@ -138,27 +138,32 @@ end
 # - - - - - - - - - - - - -
 # Fermionic Hamiltonians
 # - - - - - - - - - - - - -
-"""
-   HELPERS
- The following functions are designed to perform the Jordan-Wigner mapping.
-"""
+
+
 function JWmapping(N; i::Int, j::Int)
-    # Compute C^dagger_i term
-    ax_term = Pauli(2^(i-1)-1, 2^(i-1), N)
-    ay_term = Pauli(2^(i)-1, 2^(i-1), N)
-    c_dagg_a = 0.5 * (ax_term - ay_term)
+    # Use bit-shifting instead of powers for performance and clarity
+    # shift = 2^(idx-1)
+    shift_i = Int128(1) << (i - 1)
+    shift_j = Int128(1) << (j - 1)
 
-    # Compute C_j term
-    bx_term = Pauli(2^(j-1)-1, 2^(j-1), N)
-    by_term = Pauli(2^(j)-1, 2^(j-1), N)
-    c_b = 0.5 * (bx_term + by_term)
+    # Construct C_i^dagger terms
+    # X_i string: (Z...Z) X_i, Y_i string: (Z...Z) Y_i
+    # Note: Pauli{N}(phase, z_bits, x_bits)
+    ax = Pauli{N}(1, shift_i - 1, shift_i)
+    ay = Pauli{N}(1, (Int128(1) << i) - 1, shift_i)
 
-    # Build C^dagger_i*C_j
-    term =  c_dagg_a * c_b
+    # Construct C_j terms
+    bx = Pauli{N}(1, shift_j - 1, shift_j)
+    by = Pauli{N}(1, (Int128(1) << j) - 1, shift_j)
 
-    return term
+    # c_i^dagger = 0.5 * (X_i - iY_i)
+    # c_j        = 0.5 * (X_j + iY_j)
+    # We use PauliBasis only at the end to minimize overhead
+    op_i_dag = 0.5 * (PauliBasis(ax) - im * PauliBasis(ay))
+    op_j     = 0.5 * (PauliBasis(bx) + im * PauliBasis(by))
+
+    return op_i_dag * op_j
 end
-
 """
  1D Fermi-Hubbard model 
 Generate a 1D Fermi-Hubbard Hamiltonian (open boundaries, no PBC)
@@ -176,7 +181,7 @@ Returns:
 - parameters::Vector{Float64}
 """
 
-function hubbard_model_1D(L::Int64, t::Float64, U::Float64)
+function hubbard_model_1D(L::Int64, t::Float64, U::Float64;pbc::Bool=false)
     
     N_total = 2 * L   # Total number of fermionic modes (spin up and down)
     H = PauliSum(N_total, Float64)
@@ -205,7 +210,21 @@ function hubbard_model_1D(L::Int64, t::Float64, U::Float64)
 
         H += interaction_term
     end
+    if pbc==true
+        # Add hopping terms for periodic boundary conditions
+        # spin-up
+        a_up = 1
+        b_up = 2*(L-1) + 1
+        hopping_up = JWmapping(N_total, i=a_up, j=b_up) + JWmapping(N_total, i=b_up, j=a_up)
 
+        # spin-down
+        a_dn = 2
+        b_dn = 2*L
+        hopping_dn = JWmapping(N_total, i=a_dn, j=b_dn) + JWmapping(N_total, i=b_dn, j=a_dn)
+        
+        # Add both
+        H += -t * (hopping_up + hopping_dn)
+    end
     #Filter zero coefficients
     DBF.coeff_clip!(H)
 
@@ -337,15 +356,7 @@ function fermi_hubbard_2D_zigzag(Lx::Int, Ly::Int, t::Float64, U::Float64)
     return H
 end
 
-# # Test Hubbard 1D
-# H = hubbard_model_1D(2, 5.0, 2.0)
-# display(H)
-# println("Number of terms in Hubbard 1D Hamiltonian: ", length(H))
 
-# # Test Hubbard 2D
-# H = fermi_hubbard_2D(1, 2, 5.0, 2.0)
-# display(H)
-# println("Number of terms in Hubbard 2x1 Hamiltonian: ", length(H))
 
 function heisenberg_central_spin(N, Jx, Jy, Jz; x=0, y=0, z=0, α=0, seed=1)
     # All spins coupled through site 1
